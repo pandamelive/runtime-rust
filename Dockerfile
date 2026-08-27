@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN mkdir -p /run/sshd \
     && sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config \
     && sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config \
-    && echo "root:runtime-rust" | chpasswd
+    && echo "root:password" | chpasswd
 
 # 安装 Rust stable 工具链
 ENV RUSTUP_HOME=/usr/local/rustup \
