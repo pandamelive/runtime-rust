@@ -1,0 +1,14 @@
+services:
+  runtime-rust:
+    image: crpi-yh02yjkhdi325jm5.cn-hangzhou.personal.cr.aliyuncs.com/pandageneral/runtime-rust:latest
+    container_name: runtime-rust
+    restart: unless-stopped
+    working_dir: /workspace
+    volumes:
+      - ./project:/workspace
+      - ./sccache-cache:/cache/sccache
+      - ./cargo-registry:/usr/local/cargo/registry
+    environment:
+      - SCCACHE_DIR=/cache/sccache
+      - SCCACHE_CACHE_SIZE=20G
+    command: ["sleep", "infinity"]
