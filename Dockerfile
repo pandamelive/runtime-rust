@@ -1,10 +1,11 @@
 # runtime-rust - Rust 构建环境镜像
-# 包含 stable 工具链、sccache、cross、musl-tools 等，用于 CI/CD 和本地构建
+# 包含 stable 工具链、sccache、cross、musl-tools、SSH 服务端等
+# 统一数据目录 /data，外部只需挂载一个文件夹
 
 FROM ubuntu:22.04
 
 LABEL maintainer="PandaNetPL"
-LABEL description="Rust 构建环境 - stable/sccache/cross/musl-tools"
+LABEL description="Rust 构建环境 - stable/sccache/cross/musl-tools/ssh"
 
 # 避免交互式配置
 ENV DEBIAN_FRONTEND=noninteractive
@@ -51,17 +52,18 @@ RUN cargo install sccache --locked
 # 安装 cross（交叉编译）
 RUN cargo install cross --locked
 
-# 配置 sccache 环境变量
+# 统一数据目录 /data：project(代码) + sccache(编译缓存) + cargo(依赖缓存)
 ENV RUSTC_WRAPPER=sccache \
-    SCCACHE_DIR=/cache/sccache \
+    SCCACHE_DIR=/data/sccache \
     SCCACHE_CACHE_SIZE=20G
 
-# 创建缓存目录
-RUN mkdir -p /cache/sccache
+RUN mkdir -p /data/project /data/sccache /data/cargo/registry \
+    && rm -rf /usr/local/cargo/registry \
+    && ln -s /data/cargo/registry /usr/local/cargo/registry
 
 # 验证安装
 RUN rustc --version && cargo --version && sccache --version && cross --version
 
-WORKDIR /workspace
+WORKDIR /data/project
 EXPOSE 22
 CMD ["/usr/sbin/sshd", "-D"]
