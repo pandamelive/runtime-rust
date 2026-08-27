@@ -19,8 +19,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     musl-tools \
     perl \
     openssh-client \
+    openssh-server \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# 配置 SSH 服务端
+RUN mkdir -p /run/sshd \
+    && sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config \
+    && sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config \
+    && echo "root:runtime-rust" | chpasswd
 
 # 安装 Rust stable 工具链
 ENV RUSTUP_HOME=/usr/local/rustup \
@@ -52,5 +59,5 @@ RUN mkdir -p /cache/sccache
 RUN rustc --version && cargo --version && sccache --version && cross --version
 
 WORKDIR /workspace
-
-CMD ["bash"]
+EXPOSE 22
+CMD ["/usr/sbin/sshd", "-D"]

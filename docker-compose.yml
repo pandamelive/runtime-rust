@@ -4,6 +4,8 @@ services:
     container_name: runtime-rust
     restart: unless-stopped
     working_dir: /workspace
+    ports:
+      - "2222:22"
     volumes:
       - ./project:/workspace
       - ./sccache-cache:/cache/sccache
@@ -11,4 +13,9 @@ services:
     environment:
       - SCCACHE_DIR=/cache/sccache
       - SCCACHE_CACHE_SIZE=20G
-    command: ["sleep", "infinity"]
+    networks:
+      - panda-net
+
+networks:
+  panda-net:
+    external: true
