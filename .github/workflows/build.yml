@@ -64,9 +64,13 @@ jobs:
 
       # ── 推送到阿里云 ACR ──
       - name: Push to Aliyun ACR
+        env:
+          ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          ALIYUN_ACR_NAMESPACE: ${{ secrets.ALIYUN_ACR_NAMESPACE }}
         run: |
-          GHCR_IMAGE="${{ env.GHCR_REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-          ALI_IMAGE="${{ secrets.ALIYUN_ACR_REGISTRY }}/${{ secrets.ALIYUN_ACR_NAMESPACE }}/runtime-rust:latest"
+          GHCR_IMAGE="ghcr.io/${{ env.IMAGE_NAME }}:latest"
+          ALI_IMAGE="${ALIYUN_ACR_REGISTRY}/${ALIYUN_ACR_NAMESPACE}/runtime-rust:latest"
+          echo "推送镜像到: ${ALI_IMAGE}"
           docker pull "$GHCR_IMAGE"
           docker tag "$GHCR_IMAGE" "$ALI_IMAGE"
           docker push "$ALI_IMAGE"
