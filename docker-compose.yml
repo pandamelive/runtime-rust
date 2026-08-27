@@ -1,6 +1,6 @@
 services:
   runtime-rust:
-    image: crpi-yh02yjkhdi325jm5.cn-hangzhou.personal.cr.aliyuncs.com/pandageneral/runtime-rust:latest
+    image: crpi-yh02yjkhdi325jm5.cn-hangzhou.personal.cr.aliyuncs.com/pnos/runtime-rust:latest
     container_name: runtime-rust
     restart: unless-stopped
     working_dir: /workspace
