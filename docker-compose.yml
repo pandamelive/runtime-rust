@@ -10,7 +10,6 @@ services:
       - ./project:/workspace
       - ./sccache-cache:/cache/sccache
       - ./cargo-registry:/usr/local/cargo/registry
-      - ./authorized_keys:/root/.ssh/authorized_keys:ro
     environment:
       - SCCACHE_DIR=/cache/sccache
       - SCCACHE_CACHE_SIZE=20G

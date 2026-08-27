@@ -23,11 +23,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# 配置 SSH 服务端
+# 配置 SSH 服务端 + 生成默认密钥对（免密登录用）
 RUN mkdir -p /run/sshd /root/.ssh \
     && chmod 700 /root/.ssh \
-    && touch /root/.ssh/authorized_keys \
-    && chmod 600 /root/.ssh/authorized_keys \
+    && ssh-keygen -t rsa -b 4096 -f /root/.ssh/id_rsa -N "" -C "runtime-rust-default" \
+    && cp /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys \
+    && chmod 600 /root/.ssh/id_rsa /root/.ssh/authorized_keys \
     && sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config \
     && sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config \
     && echo "root:password" | chpasswd
