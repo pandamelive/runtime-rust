@@ -26,9 +26,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxml2-dev \
     libsqlite3-dev \
     xz-utils \
-    file \
-    jq \
-    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # 配置 SSH 服务端 + 生成默认密钥对（免密登录用）
@@ -52,7 +49,6 @@ ENV RUSTUP_HOME=/usr/local/rustup \
 #   rustup target add x86_64-pc-windows-gnu
 #   (注意: win-msvc / apple-darwin 在 Linux 上无法真正链接，需对应 SDK)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal \
-    && rustup component add clippy rustfmt \
     && rustup target add x86_64-unknown-linux-musl
 
 # 安装 sccache（编译缓存）
@@ -61,9 +57,11 @@ RUN cargo install sccache --locked
 # 安装 cross（交叉编译）
 RUN cargo install cross --locked
 
-# 安装 mold 快速链接器（从 GitHub 下载最新版）
-RUN MOLD_VERSION=$(curl -s --retry 3 --retry-delay 5 https://api.github.com/repos/rui314/mold/releases/latest | grep -oP '"tag_name": "\K[^"]+') \
-    && curl -fsSL --retry 3 --retry-delay 5 "https://github.com/rui314/mold/releases/download/${MOLD_VERSION}/mold-${MOLD_VERSION}-x86_64-linux.tar.gz" -o /tmp/mold.tar.gz \
+# 安装 mold 快速链接器（固定版本，避免 GitHub API 限流导致构建失败）
+ENV MOLD_VERSION=2.42.0
+RUN curl -fsSL --retry 3 --retry-delay 5 \
+    "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/mold-${MOLD_VERSION}-x86_64-linux.tar.gz" \
+    -o /tmp/mold.tar.gz \
     && tar -xzf /tmp/mold.tar.gz -C /tmp \
     && cp /tmp/mold-${MOLD_VERSION}-x86_64-linux/bin/mold /usr/local/bin/mold \
     && cp /tmp/mold-${MOLD_VERSION}-x86_64-linux/bin/ld.mold /usr/local/bin/ld.mold \
