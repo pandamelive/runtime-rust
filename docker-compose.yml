@@ -3,13 +3,13 @@ services:
     image: crpi-yh02yjkhdi325jm5.cn-hangzhou.personal.cr.aliyuncs.com/pnos/runtime-rust:latest
     container_name: runtime-rust
     restart: unless-stopped
-    working_dir: /data/project
+    working_dir: /workspace
     ports:
       - "2222:22"
     volumes:
-      - ./data:/data
+      - ./project:/workspace
     environment:
-      - SCCACHE_DIR=/data/sccache
+      - SCCACHE_DIR=/cache/sccache
       - SCCACHE_CACHE_SIZE=20G
     networks:
       - panda-net

@@ -1,6 +1,5 @@
 # runtime-rust - Rust 构建环境镜像
 # 包含 stable 工具链、sccache、cross、musl-tools、SSH 服务端等
-# 统一数据目录 /data，外部只需挂载一个文件夹
 
 FROM ubuntu:22.04
 
@@ -52,18 +51,16 @@ RUN cargo install sccache --locked
 # 安装 cross（交叉编译）
 RUN cargo install cross --locked
 
-# 统一数据目录 /data：project(代码) + sccache(编译缓存) + cargo(依赖缓存)
+# 配置 sccache
 ENV RUSTC_WRAPPER=sccache \
-    SCCACHE_DIR=/data/sccache \
+    SCCACHE_DIR=/cache/sccache \
     SCCACHE_CACHE_SIZE=20G
 
-RUN mkdir -p /data/project /data/sccache /data/cargo/registry \
-    && rm -rf /usr/local/cargo/registry \
-    && ln -s /data/cargo/registry /usr/local/cargo/registry
+RUN mkdir -p /cache/sccache
 
 # 验证安装
 RUN rustc --version && cargo --version && sccache --version && cross --version
 
-WORKDIR /data/project
+WORKDIR /workspace
 EXPOSE 22
 CMD ["/usr/sbin/sshd", "-D"]
