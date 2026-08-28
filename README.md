@@ -37,20 +37,20 @@ Rust 构建环境 Docker 镜像，用于 CI/CD 和本地构建 Rust 项目。
 - 公钥：`/root/.ssh/id_ed25519.pub`
 - authorized_keys：`/root/.ssh/authorized_keys`（自动写入公钥，免密登录用）
 
-持久化目录密钥路径（每次启动自动复制，覆盖旧密钥）：
+持久化目录密钥路径（每次启动自动清空旧目录并放入最新密钥）：
 - 私钥：`/workspace/.ssh/id_ed25519`
 - 公钥：`/workspace/.ssh/id_ed25519.pub`
 
-> 因为 `/workspace` 是持久化挂载，可能保留了上次容器的旧密钥，所以每次启动都会用当前容器的最新密钥覆盖。
+> **重要**：每次容器启动都会执行 `rm -rf /workspace/.ssh`，清空整个密钥目录后再放入最新密钥。这确保了持久化目录里只有当前容器的最新密钥，不会残留旧版本（如 `id_rsa`）或上次容器的密钥。
 
 ### agent-canvas 容器里的密钥路径
 
 如果 agent-canvas 容器挂载了 runtime-rust 的 `/workspace` 目录（或共享同一 volume），在 agent-canvas 容器内读取密钥的路径为：
 
 - **当前版本（ED25519）**：`/home/openhands/workspace/.ssh/id_ed25519`
-- **旧版本（RSA）**：`/home/openhands/workspace/.ssh/id_rsa`
+- **旧版本（RSA）**：`/home/openhands/workspace/.ssh/id_rsa`（已废弃，v2 起不再生成）
 
-> 注意：v2 版本起密钥类型从 RSA 改为 ED25519，文件名从 `id_rsa` 变为 `id_ed25519`。如果 agent-canvas 里的脚本写死了 `id_rsa` 路径，需要更新为 `id_ed25519`，或在 entrypoint.sh 里添加兼容符号链接。
+> 注意：v2 版本起密钥类型从 RSA 改为 ED25519，文件名从 `id_rsa` 变为 `id_ed25519`。每次启动会清空旧目录，所以升级后 agent-canvas 里只会看到 `id_ed25519`，不会有旧的 `id_rsa` 残留。
 
 ### 权限设置
 
