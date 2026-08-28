@@ -43,6 +43,15 @@ Rust 构建环境 Docker 镜像，用于 CI/CD 和本地构建 Rust 项目。
 
 > 因为 `/workspace` 是持久化挂载，可能保留了上次容器的旧密钥，所以每次启动都会用当前容器的最新密钥覆盖。
 
+### agent-canvas 容器里的密钥路径
+
+如果 agent-canvas 容器挂载了 runtime-rust 的 `/workspace` 目录（或共享同一 volume），在 agent-canvas 容器内读取密钥的路径为：
+
+- **当前版本（ED25519）**：`/home/openhands/workspace/.ssh/id_ed25519`
+- **旧版本（RSA）**：`/home/openhands/workspace/.ssh/id_rsa`
+
+> 注意：v2 版本起密钥类型从 RSA 改为 ED25519，文件名从 `id_rsa` 变为 `id_ed25519`。如果 agent-canvas 里的脚本写死了 `id_rsa` 路径，需要更新为 `id_ed25519`，或在 entrypoint.sh 里添加兼容符号链接。
+
 ### 权限设置
 
 - `/workspace/.ssh/` 目录：700
@@ -55,7 +64,17 @@ Rust 构建环境 Docker 镜像，用于 CI/CD 和本地构建 Rust 项目。
 如果其他容器（如 agent-canvas）挂载了同一个 `/workspace` 目录，可以直接读取私钥免密登录 runtime-rust：
 
 ```bash
-ssh -i /workspace/.ssh/id_ed25519 -p 2222 -o StrictHostKeyChecking=no root@<runtime-rust-ip>
+# agent-canvas 容器内执行
+ssh -i /home/openhands/workspace/.ssh/id_ed25519 -p 2222 \
+  -o StrictHostKeyChecking=no \
+  -o UserKnownHostsFile=/dev/null \
+  root@<runtime-rust-ip>
+```
+
+连接后直接可用 cargo（已全局配置，不需要 source 任何环境脚本）：
+```bash
+ssh -i /home/openhands/workspace/.ssh/id_ed25519 -p 2222 root@<runtime-rust-ip> \
+  'cd /workspace/project && cargo build --release'
 ```
 
 ### root 密码
