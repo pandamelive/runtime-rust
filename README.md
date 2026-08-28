@@ -20,6 +20,47 @@ Rust 构建环境 Docker 镜像，用于 CI/CD 和本地构建 Rust 项目。
 
 > 工具链全局可用：`cargo`/`rustc`/`rustup`/`sccache`/`cross`/`cargo-clippy`/`cargo-fmt` 已符号链接到 `/usr/local/bin` 并写入 `/etc/environment`，SSH 登录（non-login shell）也能直接用。
 > 依赖下载走国内镜像源（rsproxy sparse），链接默认走 mold。
+> apt 源已切换为阿里云镜像，国内构建和运行时更快。
+
+## SSH 密钥说明
+
+### 密钥生成策略
+
+- **第一次启动容器**：自动生成一对新的 ED25519 SSH 密钥对
+- **容器重启（docker restart）**：沿用原密钥，不重新生成
+- **容器重建（docker rm + docker run / compose up --force-recreate）**：生成新的密钥对
+
+### 密钥位置
+
+容器内密钥路径：
+- 私钥：`/root/.ssh/id_ed25519`
+- 公钥：`/root/.ssh/id_ed25519.pub`
+- authorized_keys：`/root/.ssh/authorized_keys`（自动写入公钥，免密登录用）
+
+持久化目录密钥路径（每次启动自动复制，覆盖旧密钥）：
+- 私钥：`/workspace/.ssh/id_ed25519`
+- 公钥：`/workspace/.ssh/id_ed25519.pub`
+
+> 因为 `/workspace` 是持久化挂载，可能保留了上次容器的旧密钥，所以每次启动都会用当前容器的最新密钥覆盖。
+
+### 权限设置
+
+- `/workspace/.ssh/` 目录：700
+- 私钥 `id_ed25519`：600
+- 公钥 `id_ed25519.pub`：644
+- 所有者：自动匹配 `/workspace` 目录的所有者（方便其他容器如 agent-canvas 的 openhands 用户读取）
+
+### 其他容器免密登录
+
+如果其他容器（如 agent-canvas）挂载了同一个 `/workspace` 目录，可以直接读取私钥免密登录 runtime-rust：
+
+```bash
+ssh -i /workspace/.ssh/id_ed25519 -p 2222 -o StrictHostKeyChecking=no root@<runtime-rust-ip>
+```
+
+### root 密码
+
+默认 root 密码为 `password`（内网环境使用，如需更安全请修改或禁用密码登录）。
 
 ## 镜像地址
 
