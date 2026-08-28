@@ -61,6 +61,10 @@ RUN mkdir -p /cache/sccache
 # 验证安装
 RUN rustc --version && cargo --version && sccache --version && cross --version
 
+# 复制启动脚本
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 WORKDIR /workspace
 EXPOSE 22
-CMD ["/usr/sbin/sshd", "-D"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
