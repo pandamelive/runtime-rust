@@ -12,7 +12,8 @@ Rust 构建环境 Docker 镜像，用于 CI/CD 和本地构建 Rust 项目。
 | musl-tools | musl 静态编译支持 |
 | perl | OpenSSL 编译依赖 |
 | build-essential | C/C++ 编译工具链 |
-| 常用 target | x86_64-linux-musl / aarch64-linux-musl / x86_64-windows-msvc / x86_64-apple-darwin / aarch64-apple-darwin |
+| 验证 target | x86_64-unknown-linux-musl（静态二进制验证，验证阶段只需这一个） |
+| 发布 target | aarch64-unknown-linux-musl / x86_64-pc-windows-gnu 等按需添加（win-msvc / apple-darwin 在 Linux 上无法真正链接，需对应 SDK） |
 
 ## 镜像地址
 
@@ -57,6 +58,14 @@ jobs:
 docker run --rm -v $(pwd):/workspace ghcr.io/pandamelive/runtime-rust:latest \
   cargo build --release --target x86_64-unknown-linux-musl
 ```
+
+### 验证阶段 target 说明
+
+- **验证阶段（CI / agent 日常验证）只需 `x86_64-unknown-linux-musl`** 一个 target：
+  - spde/pk 等项目的 `cargo build / test / clippy` 日常验证在 gnu target 下完成；
+  - 需要静态二进制产物验证时，用 `x86_64-unknown-linux-musl` 编译即可。
+- **发布阶段**才按目标平台增加 target（aarch64-unknown-linux-musl、x86_64-pc-windows-gnu 等），已注释在 Dockerfile 中，按需取消注释。
+- 注意：`x86_64-pc-windows-msvc`、`x86_64-apple-darwin`、`aarch64-apple-darwin` 在 Linux 主机上无法真正链接（缺对应 SDK/工具链），不做验证 target。
 
 ## 环境变量
 

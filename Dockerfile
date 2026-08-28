@@ -38,12 +38,13 @@ ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH
 
+# 验证阶段只需 x86_64-unknown-linux-musl（静态二进制验证）
+# 发布阶段需要更多 target 时，取消注释对应行：
+#   rustup target add aarch64-unknown-linux-musl
+#   rustup target add x86_64-pc-windows-gnu
+#   (注意: win-msvc / apple-darwin 在 Linux 上无法真正链接，需对应 SDK)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal \
-    && rustup target add x86_64-unknown-linux-musl \
-    && rustup target add aarch64-unknown-linux-musl \
-    && rustup target add x86_64-pc-windows-msvc \
-    && rustup target add x86_64-apple-darwin \
-    && rustup target add aarch64-apple-darwin
+    && rustup target add x86_64-unknown-linux-musl
 
 # 安装 sccache（编译缓存）
 RUN cargo install sccache --locked
