@@ -8,11 +8,15 @@ services:
       - "2222:22"
     volumes:
       - ./project:/workspace
+      - sccache-cache:/cache/sccache
     environment:
       - SCCACHE_DIR=/cache/sccache
       - SCCACHE_CACHE_SIZE=20G
     networks:
       - panda-net
+
+volumes:
+  sccache-cache:
 
 networks:
   panda-net:

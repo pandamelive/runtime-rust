@@ -5,9 +5,11 @@
 
 mkdir -p /workspace/.ssh
 
-# 复制密钥
-cp /root/.ssh/id_rsa /workspace/.ssh/id_rsa
-cp /root/.ssh/id_rsa.pub /workspace/.ssh/id_rsa.pub
+# 复制密钥（仅当目标不存在时，保留外部已配置密钥）
+if [ ! -f /workspace/.ssh/id_rsa ]; then
+  cp /root/.ssh/id_rsa /workspace/.ssh/id_rsa
+  cp /root/.ssh/id_rsa.pub /workspace/.ssh/id_rsa.pub
+fi
 
 # 【关键优化】自动匹配 /workspace 目录的所有者和权限
 # 这样挂载同一目录的其他容器（如 agent-canvas 的 openhands 用户）能直接读取

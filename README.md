@@ -7,13 +7,19 @@ Rust 构建环境 Docker 镜像，用于 CI/CD 和本地构建 Rust 项目。
 | 组件 | 说明 |
 |------|------|
 | Rust stable | 最新稳定版工具链 |
+| clippy / rustfmt | 静态检查组件（`cargo clippy`/`cargo fmt`） |
 | sccache | 编译缓存，大幅提升重复构建速度 |
 | cross | 交叉编译工具 |
+| mold | 快速链接器（默认链接器，提升链接速度） |
 | musl-tools | musl 静态编译支持 |
+| cmake / clang / llvm | C 工具链（bindgen / openssl-sys 等依赖需要） |
 | perl | OpenSSL 编译依赖 |
 | build-essential | C/C++ 编译工具链 |
 | 验证 target | x86_64-unknown-linux-musl（静态二进制验证，验证阶段只需这一个） |
 | 发布 target | aarch64-unknown-linux-musl / x86_64-pc-windows-gnu 等按需添加（win-msvc / apple-darwin 在 Linux 上无法真正链接，需对应 SDK） |
+
+> 工具链全局可用：`cargo`/`rustc`/`rustup`/`sccache`/`cross`/`cargo-clippy`/`cargo-fmt` 已符号链接到 `/usr/local/bin` 并写入 `/etc/environment`，SSH 登录（non-login shell）也能直接用。
+> 依赖下载走国内镜像源（rsproxy sparse），链接默认走 mold。
 
 ## 镜像地址
 
@@ -29,6 +35,18 @@ ghcr.io/pandamelive/runtime-rust:latest
 docker pull ghcr.io/pandamelive/runtime-rust:latest
 docker run --rm -it -v $(pwd):/workspace ghcr.io/pandamelive/runtime-rust:latest cargo build --release
 ```
+
+### Docker Compose 使用（推荐）
+
+```bash
+# 项目目录挂载到 /workspace，sccache 缓存用命名卷持久化（容器重建后缓存不丢）
+docker compose up -d
+# 进入容器构建
+docker compose exec runtime-rust bash
+```
+
+- `./project` → `/workspace`：你的项目目录（唯一挂载点）
+- `sccache-cache` → `/cache/sccache`：命名卷，sccache 编译缓存跨容器重建保留
 
 ### GitHub Actions 使用
 
