@@ -7,6 +7,10 @@ LABEL description="Rust 构建环境 - stable/sccache/cross/musl-tools/mold/ssh 
 # 避免交互式配置
 ENV DEBIAN_FRONTEND=noninteractive
 
+# 使用国内 apt 源（阿里云），提升国内构建和运行时 apt 速度
+RUN sed -i 's|archive.ubuntu.com|mirrors.aliyun.com|g' /etc/apt/sources.list && \
+    sed -i 's|security.ubuntu.com|mirrors.aliyun.com|g' /etc/apt/sources.list
+
 # 安装系统依赖（新增 cmake/clang/libclang-dev/mold 依赖）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
