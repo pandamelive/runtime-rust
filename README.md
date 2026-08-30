@@ -2,6 +2,31 @@
 
 Rust 构建环境 Docker 镜像，用于 CI/CD 和本地构建 Rust 项目。
 
+## 生态定位
+
+本项目是 **PandaNetOS 生态项目群**的标准 Rust 构建环境镜像，为 [PandaNetOS](https://github.com/PandaNetOS/PandaNetOS) 生态下所有 Rust 项目（PK、SPDE 等）提供统一的编译环境。
+
+### 标准库路径约定
+
+使用本镜像构建生态项目时，项目需与 `PandaNetOS` 标准库仓库保持同级目录布局：
+
+```
+<workspace>/
+├── PandaNetOS/              # 标准库仓库（必须与项目同级）
+│   └── crates/pandanetos/
+├── pk/                      # 主控台
+└── spde/                    # 下载节点
+```
+
+项目 `Cargo.toml` 中统一使用 path 依赖：
+
+```toml
+[dependencies]
+pandanetos = { path = "../PandaNetOS/crates/pandanetos" }
+```
+
+> 本镜像内置 sccache、cross、mold、musl-tools 等工具，配合上述目录布局可直接构建生态项目。
+
 ## 包含组件
 
 | 组件 | 说明 |
