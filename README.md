@@ -27,7 +27,7 @@ pandanetos = { path = "../PandaNetOS/crates/pandanetos" }
 
 > 本镜像内置 sccache、cross、mold、musl-tools 等工具，配合上述目录布局可直接构建生态项目。
 
-## 包含组件
+## 功能特性
 
 | 组件 | 说明 |
 |------|------|
@@ -46,6 +46,14 @@ pandanetos = { path = "../PandaNetOS/crates/pandanetos" }
 > 工具链全局可用：`cargo`/`rustc`/`rustup`/`sccache`/`cross`/`cargo-clippy`/`cargo-fmt` 已符号链接到 `/usr/local/bin` 并写入 `/etc/environment`，SSH 登录（non-login shell）也能直接用。
 > 依赖下载走国内镜像源（rsproxy sparse），链接默认走 mold。
 > apt 源已切换为阿里云镜像，国内构建和运行时更快。
+
+### 核心优势
+
+- **开箱即用**：预装 Rust 工具链、sccache、cross、mold 等全部构建依赖
+- **国内加速**：rsproxy 稀疏索引 + 阿里云 apt 源，国内构建速度提升显著
+- **交叉编译**：内置 cross，支持 x86_64 / aarch64 / Windows 等多目标交叉编译
+- **SSH 免密**：自动生成 ED25519 密钥，支持 agent-canvas 等容器免密登录
+- **静态编译**：musl-tools 支持，可生成完全静态的 Linux 二进制
 
 ## SSH 密钥说明
 
@@ -187,3 +195,36 @@ docker build -t runtime-rust .
 ## License
 
 MIT
+
+## 开发指南
+
+### 构建镜像
+
+```bash
+docker build -t runtime-rust:latest .
+```
+
+### 本地测试
+
+```bash
+docker run --rm -it runtime-rust:latest cargo --version
+docker run --rm -it runtime-rust:latest rustc --version
+```
+
+### 合规检查
+
+本项目遵循 PandaNetOS 生态合规标准，提交 PR 前请确保：
+
+- README 格式符合标准库规范
+- 无敏感信息（密钥、Token 等）
+- CI 工作流完整（Compliance Check、Tag Guard）
+
+## 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feat/awesome-feature`)
+3. 提交更改 (`git commit -m 'feat: add awesome feature'`)
+4. 推送到分支 (`git push origin feat/awesome-feature`)
+5. 创建 Pull Request
