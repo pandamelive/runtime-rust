@@ -121,6 +121,17 @@ RUN echo 'CARGO_HOME=/usr/local/cargo' >> /etc/environment && \
     echo 'SCCACHE_CACHE_SIZE=20G' >> /etc/environment && \
     echo 'PATH=/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' >> /etc/environment
 
+# GitHub Actions Runner（设置 RUNNER_TOKEN 时自动启用，不设置则纯 SSH 模式）
+ARG RUNNER_VERSION=2.319.1
+RUN arch=$(uname -m) && \
+    curl -fsSL --retry 3 --retry-delay 5 \
+    "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-${arch}-${RUNNER_VERSION}.tar.gz" \
+    -o /tmp/runner.tar.gz && \
+    mkdir -p /opt/runner && tar xzf /tmp/runner.tar.gz -C /opt/runner && \
+    rm /tmp/runner.tar.gz && \
+    /opt/runner/bin/installdependencies.sh
+ENV PATH=/opt/runner/bin:$PATH
+
 # 验证安装
 RUN rustc --version && cargo --version && sccache --version && cross --version && mold --version && clang --version | head -1
 
