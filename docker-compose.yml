@@ -1,6 +1,6 @@
 services:
   runtime-rust:
-    image: crpi-yh02yjkhdi325jm5.cn-hangzhou.personal.cr.aliyuncs.com/pnos/runtime-rust:latest
+    image: ghcr.io/pandamelive/runtime-rust:latest
     container_name: runtime-rust
     restart: unless-stopped
     working_dir: /workspace
@@ -9,9 +9,22 @@ services:
     volumes:
       - ./project:/workspace
       - sccache-cache:/cache/sccache
+      # Runner 模式下 cross 交叉编译需要 Docker-in-Docker，取消下面注释
+      # - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - SCCACHE_DIR=/cache/sccache
       - SCCACHE_CACHE_SIZE=20G
+      # ===== Runner 模式（设置后自动变成 GitHub Actions Runner）=====
+      # 不设置下面两项则为纯 SSH 模式（默认）
+      # - REPO_URL=https://github.com/pandamelive/pk
+      # - RUNNER_TOKEN=xxxxxxxxxxxxxxxxxxxx
+      # - RUNNER_NAME=runtime-rust-01
+      # - RUNNER_LABELS=runtime-rust,self-hosted,linux,x64,rust
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 8G
     networks:
       - panda-net
 

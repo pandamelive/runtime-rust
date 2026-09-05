@@ -1,10 +1,10 @@
 #!/bin/bash
-# runtime-rust 启动脚本（优化版）
-# 1. 第一次启动时生成 SSH 密钥对（容器重启不重新生成，容器重建才生成新的）
-# 2. 每次启动都清空 /workspace/.ssh/ 目录，放入最新密钥（删除旧密钥，只保留最新的）
-# 3. 启动 sshd 服务
+# runtime-rust 启动脚本
+# 双模式：
+#   1. 纯 SSH 模式（默认）：不设置 RUNNER_TOKEN，只启动 sshd，行为与旧版完全一致
+#   2. Runner 模式：设置 RUNNER_TOKEN + REPO_URL，后台启动 sshd，前台运行 GitHub Actions Runner
 
-# 第一次启动时生成密钥对（仅当不存在时，容器重启沿用原密钥，容器重建才生成新的）
+# ==================== SSH 密钥（两种模式都执行）====================
 if [ ! -f /root/.ssh/id_ed25519 ]; then
   echo "[runtime-rust] 第一次启动，生成新的 ED25519 密钥对..."
   ssh-keygen -t ed25519 -f /root/.ssh/id_ed25519 -N "" -C "runtime-rust-$(hostname)"
@@ -16,25 +16,63 @@ else
   echo "[runtime-rust] 密钥已存在，沿用原密钥（容器重启不重新生成）"
 fi
 
-# 每次启动都清空 /workspace/.ssh/ 目录（删除旧密钥，包括 id_rsa 等历史残留），然后放入最新密钥
-# 因为 /workspace 是持久化挂载，可能保留了上次容器的旧密钥，必须清空确保只有最新的
 rm -rf /workspace/.ssh
 mkdir -p /workspace/.ssh
 cp /root/.ssh/id_ed25519 /workspace/.ssh/id_ed25519
 cp /root/.ssh/id_ed25519.pub /workspace/.ssh/id_ed25519.pub
 
-# 自动匹配 /workspace 目录的所有者和权限
-# 这样挂载同一目录的其他容器（如 agent-canvas 的 openhands 用户）能直接读取
 WORKSPACE_OWNER=$(stat -c '%u:%g' /workspace 2>/dev/null || echo "0:0")
 chown -R "$WORKSPACE_OWNER" /workspace/.ssh 2>/dev/null || true
 chmod 700 /workspace/.ssh 2>/dev/null || true
 chmod 600 /workspace/.ssh/id_ed25519 2>/dev/null || true
 chmod 644 /workspace/.ssh/id_ed25519.pub 2>/dev/null || true
 
-echo "[runtime-rust] 已清空 /workspace/.ssh/ 并放入最新密钥（仅保留 id_ed25519）"
-echo "[runtime-rust] 所有者匹配: $WORKSPACE_OWNER"
-echo "[runtime-rust] 其他容器可通过此私钥免密登录本容器"
-echo "[runtime-rust] 密钥策略: 第一次启动生成，容器重启沿用，容器重建才生成新的"
-echo "[runtime-rust] cargo/rustc 已全局可用（符号链接 + /etc/environment）"
+echo "[runtime-rust] 密钥已同步到 /workspace/.ssh/，所有者: $WORKSPACE_OWNER"
+echo "[runtime-rust] cargo/rustc/sccache/cross 已全局可用"
+
+# ==================== 启动 sshd ====================
 echo "[runtime-rust] 启动 sshd..."
-exec /usr/sbin/sshd -D
+/usr/sbin/sshd
+
+# ==================== Runner 模式判断 ====================
+if [ -z "${RUNNER_TOKEN}" ] || [ -z "${REPO_URL}" ]; then
+  echo "[runtime-rust] 未设置 RUNNER_TOKEN / REPO_URL，进入纯 SSH 模式"
+  echo "[runtime-rust] SSH 监听 22 端口，root 密码: password"
+  # 前台保持容器运行
+  tail -f /dev/null
+fi
+
+# ==================== GitHub Actions Runner 模式 ====================
+RUNNER_NAME="${RUNNER_NAME:-runtime-rust-$(hostname)}"
+RUNNER_LABELS="${RUNNER_LABELS:-runtime-rust,self-hosted,linux,x64,rust}"
+RUNNER_GROUP="${RUNNER_GROUP:-Default}"
+
+echo "[runtime-rust] ===== GitHub Actions Runner 模式 ====="
+echo "[runtime-rust] 仓库: ${REPO_URL}"
+echo "[runtime-rust] 名称: ${RUNNER_NAME}"
+echo "[runtime-rust] 标签: ${RUNNER_LABELS}"
+
+# 注册 runner
+echo "[runtime-rust] 注册 runner..."
+cd /opt/runner
+./config.sh \
+    --unattended \
+    --url "${REPO_URL}" \
+    --token "${RUNNER_TOKEN}" \
+    --name "${RUNNER_NAME}" \
+    --labels "${RUNNER_LABELS}" \
+    --runnergroup "${RUNNER_GROUP}" \
+    --replace
+
+# 退出时自动注销
+cleanup() {
+    echo ""
+    echo "[runtime-rust] 注销 runner..."
+    cd /opt/runner
+    ./config.sh remove --unattended --token "${RUNNER_TOKEN}" || true
+    exit 0
+}
+trap cleanup SIGTERM SIGINT
+
+echo "[runtime-rust] 启动 runner，等待任务..."
+./run.sh
