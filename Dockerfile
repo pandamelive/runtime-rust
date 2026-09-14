@@ -1,8 +1,9 @@
-# runtime-rust - Rust 构建环境镜像（优化版）
-# 包含 stable 工具链、sccache、cross、musl-tools、mold、SSH 服务端等
+# runtime-rust - Rust 构建环境镜像（全量工具版）
+# 包含 stable 工具链(default profile)、sccache、cross、musl-tools、mold、SSH 服务端、
+# rustfmt、clippy、PowerShell、cargo-deny/udeps/outdated/nextest/bloat/expand、调试工具等
 FROM ubuntu:22.04
 LABEL maintainer="PandaNetPL"
-LABEL description="Rust 构建环境 - stable/sccache/cross/musl-tools/mold/ssh (optimized)"
+LABEL description="Rust 构建环境 - stable(default)/sccache/cross/musl-tools/mold/ssh/rustfmt/clippy/pwsh/cargo-tools (full)"
 
 # 避免交互式配置
 ENV DEBIAN_FRONTEND=noninteractive
@@ -11,7 +12,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN sed -i 's|archive.ubuntu.com|mirrors.aliyun.com|g' /etc/apt/sources.list && \
     sed -i 's|security.ubuntu.com|mirrors.aliyun.com|g' /etc/apt/sources.list
 
-# 安装系统依赖（新增 cmake/clang/libclang-dev/mold 依赖）
+# 安装系统依赖（编译基础 + 开发工具 + 调试工具）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
@@ -30,7 +31,39 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxml2-dev \
     libsqlite3-dev \
     xz-utils \
+    # 文本/JSON 处理
+    ripgrep \
+    jq \
+    fd-find \
+    # 数据库调试
+    sqlite3 \
+    # 构建/脚本
+    make \
+    python3 \
+    python3-pip \
+    # 网络/调试
+    lsof \
+    net-tools \
+    iproute2 \
+    tcpdump \
+    strace \
+    gdb \
+    # 压缩/同步
+    zip \
+    unzip \
+    rsync \
     && rm -rf /var/lib/apt/lists/*
+
+# 安装 PowerShell（合规脚本 check-compliance.ps1 运行环境）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        wget \
+        apt-transport-https \
+        software-properties-common \
+    && wget -q "https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb" \
+    && dpkg -i packages-microsoft-prod.deb \
+    && apt-get update && apt-get install -y --no-install-recommends \
+        powershell \
+    && rm -rf /var/lib/apt/lists/* packages-microsoft-prod.deb
 
 # 配置 SSH 服务端（密钥在 entrypoint.sh 第一次启动时生成，容器重启不重新生成）
 RUN mkdir -p /run/sshd /root/.ssh \
@@ -39,7 +72,7 @@ RUN mkdir -p /run/sshd /root/.ssh \
     && sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config \
     && echo "root:password" | chpasswd
 
-# 安装 Rust stable 工具链
+# 安装 Rust stable 工具链（default profile 含 rustfmt + clippy + rust-docs）
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH
@@ -49,7 +82,7 @@ ENV RUSTUP_HOME=/usr/local/rustup \
 #   rustup target add aarch64-unknown-linux-musl
 #   rustup target add x86_64-pc-windows-gnu
 #   (注意: win-msvc / apple-darwin 在 Linux 上无法真正链接，需对应 SDK)
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal \
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile default \
     && rustup target add x86_64-unknown-linux-musl
 
 # 安装 sccache（编译缓存）
@@ -57,6 +90,15 @@ RUN cargo install sccache --locked
 
 # 安装 cross（交叉编译）
 RUN cargo install cross --locked
+
+# 安装 cargo 开发工具（全量）
+RUN cargo install --locked \
+        cargo-deny \
+        cargo-udeps \
+        cargo-outdated \
+        cargo-nextest \
+        cargo-bloat \
+        cargo-expand
 
 # 安装 mold 快速链接器（固定版本，避免 GitHub API 限流导致构建失败）
 ENV MOLD_VERSION=2.42.0
@@ -104,14 +146,22 @@ ENV RUSTC_WRAPPER=sccache \
 RUN mkdir -p /cache/sccache
 
 # 【关键优化】创建全局符号链接，确保 cargo/rustc 在任何 shell（包括 SSH non-login）都可用
+# default profile 下 rustfmt/clippy 一定存在，无需静默失败
 RUN ln -sf /usr/local/cargo/bin/cargo /usr/local/bin/cargo && \
     ln -sf /usr/local/cargo/bin/rustc /usr/local/bin/rustc && \
     ln -sf /usr/local/cargo/bin/rustup /usr/local/bin/rustup && \
     ln -sf /usr/local/cargo/bin/sccache /usr/local/bin/sccache && \
     ln -sf /usr/local/cargo/bin/cross /usr/local/bin/cross && \
-    ln -sf /usr/local/cargo/bin/cargo-clippy /usr/local/bin/cargo-clippy 2>/dev/null || true && \
-    ln -sf /usr/local/cargo/bin/cargo-fmt /usr/local/bin/cargo-fmt 2>/dev/null || true && \
-    ln -sf /usr/local/cargo/bin/rustfmt /usr/local/bin/rustfmt 2>/dev/null || true
+    ln -sf /usr/local/cargo/bin/cargo-clippy /usr/local/bin/cargo-clippy && \
+    ln -sf /usr/local/cargo/bin/cargo-fmt /usr/local/bin/cargo-fmt && \
+    ln -sf /usr/local/cargo/bin/rustfmt /usr/local/bin/rustfmt && \
+    ln -sf /usr/local/cargo/bin/cargo-deny /usr/local/bin/cargo-deny && \
+    ln -sf /usr/local/cargo/bin/cargo-udeps /usr/local/bin/cargo-udeps && \
+    ln -sf /usr/local/cargo/bin/cargo-outdated /usr/local/bin/cargo-outdated && \
+    ln -sf /usr/local/cargo/bin/cargo-nextest /usr/local/bin/cargo-nextest && \
+    ln -sf /usr/local/cargo/bin/cargo-bloat /usr/local/bin/cargo-bloat && \
+    ln -sf /usr/local/cargo/bin/cargo-expand /usr/local/bin/cargo-expand && \
+    ln -sf /usr/bin/pwsh /usr/local/bin/pwsh
 
 # 【双保险】环境变量写入 /etc/environment，确保 SSH non-login shell 继承
 RUN echo 'CARGO_HOME=/usr/local/cargo' >> /etc/environment && \
@@ -132,8 +182,21 @@ RUN arch=$(uname -m) && \
     /opt/runner/bin/installdependencies.sh
 ENV PATH=/opt/runner/bin:$PATH
 
-# 验证安装
-RUN rustc --version && cargo --version && sccache --version && cross --version && mold --version && clang --version | head -1
+# 验证安装（全量工具验证）
+RUN rustc --version && \
+    cargo --version && \
+    rustfmt --version && \
+    cargo clippy --version && \
+    sccache --version && \
+    cross --version && \
+    mold --version && \
+    clang --version | head -1 && \
+    pwsh --version && \
+    cargo deny --version && \
+    cargo nextest --version && \
+    rg --version | head -1 && \
+    jq --version && \
+    sqlite3 --version
 
 # 复制启动脚本
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
