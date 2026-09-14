@@ -1,6 +1,6 @@
 # runtime-rust - Rust 构建环境镜像（全量工具版）
 # 包含 stable 工具链(default profile)、sccache、cross、musl-tools、mold、SSH 服务端、
-# rustfmt、clippy、PowerShell、cargo-deny/udeps/outdated/nextest/bloat/expand、调试工具等
+# rustfmt、clippy、PowerShell、cargo-deny/udeps/outdated/nextest/bloat、调试工具等
 FROM ubuntu:22.04
 LABEL maintainer="PandaNetPL"
 LABEL description="Rust 构建环境 - stable(default)/sccache/cross/musl-tools/mold/ssh/rustfmt/clippy/pwsh/cargo-tools (full)"
@@ -59,7 +59,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         wget \
         apt-transport-https \
         software-properties-common \
-    && wget -q "https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb" \
+    && wget -q --retry=3 --tries=3 "https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb" \
     && dpkg -i packages-microsoft-prod.deb \
     && apt-get update && apt-get install -y --no-install-recommends \
         powershell \
@@ -91,14 +91,12 @@ RUN cargo install sccache --locked
 # 安装 cross（交叉编译）
 RUN cargo install cross --locked
 
-# 安装 cargo 开发工具（全量）
-RUN cargo install --locked \
-        cargo-deny \
-        cargo-udeps \
-        cargo-outdated \
-        cargo-nextest \
-        cargo-bloat \
-        cargo-expand
+# 安装 cargo 开发工具（分开安装，便于定位问题；cargo-expand 需 nightly，暂不包含）
+RUN cargo install cargo-deny --locked
+RUN cargo install cargo-udeps --locked
+RUN cargo install cargo-outdated --locked
+RUN cargo install cargo-nextest --locked
+RUN cargo install cargo-bloat --locked
 
 # 安装 mold 快速链接器（固定版本，避免 GitHub API 限流导致构建失败）
 ENV MOLD_VERSION=2.42.0
@@ -160,8 +158,8 @@ RUN ln -sf /usr/local/cargo/bin/cargo /usr/local/bin/cargo && \
     ln -sf /usr/local/cargo/bin/cargo-outdated /usr/local/bin/cargo-outdated && \
     ln -sf /usr/local/cargo/bin/cargo-nextest /usr/local/bin/cargo-nextest && \
     ln -sf /usr/local/cargo/bin/cargo-bloat /usr/local/bin/cargo-bloat && \
-    ln -sf /usr/local/cargo/bin/cargo-expand /usr/local/bin/cargo-expand && \
-    ln -sf /usr/bin/pwsh /usr/local/bin/pwsh
+    ln -sf /usr/bin/pwsh /usr/local/bin/pwsh && \
+    ln -sf /usr/bin/fdfind /usr/local/bin/fd
 
 # 【双保险】环境变量写入 /etc/environment，确保 SSH non-login shell 继承
 RUN echo 'CARGO_HOME=/usr/local/cargo' >> /etc/environment && \
@@ -182,21 +180,14 @@ RUN arch=$(uname -m) && \
     /opt/runner/bin/installdependencies.sh
 ENV PATH=/opt/runner/bin:$PATH
 
-# 验证安装（全量工具验证）
-RUN rustc --version && \
-    cargo --version && \
-    rustfmt --version && \
-    cargo clippy --version && \
-    sccache --version && \
-    cross --version && \
-    mold --version && \
-    clang --version | head -1 && \
-    pwsh --version && \
-    cargo deny --version && \
-    cargo nextest --version && \
-    rg --version | head -1 && \
-    jq --version && \
-    sqlite3 --version
+# 验证安装（用 which 确保工具存在，避免 --version 输出格式差异导致失败）
+RUN which rustc && which cargo && which rustfmt && which cargo-clippy && \
+    which sccache && which cross && which mold && which clang && \
+    which pwsh && which cargo-deny && which cargo-nextest && \
+    which rg && which jq && which sqlite3 && which fd && \
+    rustc --version && cargo --version && rustfmt --version && \
+    cargo clippy --version && sccache --version && cross --version && \
+    mold --version && pwsh --version
 
 # 复制启动脚本
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
