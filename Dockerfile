@@ -1,9 +1,9 @@
 # runtime-rust - Rust 构建环境镜像（全量工具版）
 # 包含 stable 工具链(default profile)、sccache、cross、musl-tools、mold、SSH 服务端、
-# rustfmt、clippy、PowerShell、cargo-deny/udeps/outdated/nextest/bloat、调试工具等
+# rustfmt、clippy、PowerShell、调试工具等
 FROM ubuntu:22.04
 LABEL maintainer="PandaNetPL"
-LABEL description="Rust 构建环境 - stable(default)/sccache/cross/musl-tools/mold/ssh/rustfmt/clippy/pwsh/cargo-tools (full)"
+LABEL description="Rust 构建环境 - stable(default)/sccache/cross/musl-tools/mold/ssh/rustfmt/clippy/pwsh (full)"
 
 # 避免交互式配置
 ENV DEBIAN_FRONTEND=noninteractive
@@ -85,7 +85,25 @@ ENV RUSTUP_HOME=/usr/local/rustup \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile default \
     && rustup target add x86_64-unknown-linux-musl
 
-# 【关键】先配置 cargo 国内源（rsproxy），确保后续所有 cargo install 走国内镜像
+# 安装 sccache（编译缓存）
+RUN cargo install sccache --locked
+
+# 安装 cross（交叉编译）
+RUN cargo install cross --locked
+
+# 安装 mold 快速链接器（固定版本，避免 GitHub API 限流导致构建失败）
+ENV MOLD_VERSION=2.42.0
+RUN curl -fsSL --retry 3 --retry-delay 5 \
+    "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/mold-${MOLD_VERSION}-x86_64-linux.tar.gz" \
+    -o /tmp/mold.tar.gz \
+    && tar -xzf /tmp/mold.tar.gz -C /tmp \
+    && cp /tmp/mold-${MOLD_VERSION}-x86_64-linux/bin/mold /usr/local/bin/mold \
+    && cp /tmp/mold-${MOLD_VERSION}-x86_64-linux/bin/ld.mold /usr/local/bin/ld.mold \
+    && rm -rf /tmp/mold* \
+    && mold --version
+
+# 配置 cargo 国内源（rsproxy，国内依赖下载更快）+ mold 链接器
+# 注意：此配置在 cargo install 之后，确保 GitHub Actions（国外）构建时从 crates.io 下载
 RUN mkdir -p /usr/local/cargo \
     && cat > /usr/local/cargo/config.toml << 'EOF'
 [source.crates-io]
@@ -112,30 +130,6 @@ rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 EOF
 
-# 安装 sccache（编译缓存）
-RUN cargo install sccache --locked
-
-# 安装 cross（交叉编译）
-RUN cargo install cross --locked
-
-# 安装 cargo 开发工具（分开安装，便于定位问题；cargo-expand 需 nightly，暂不包含）
-RUN cargo install cargo-deny --locked
-RUN cargo install cargo-udeps --locked
-RUN cargo install cargo-outdated --locked
-RUN cargo install cargo-nextest --locked
-RUN cargo install cargo-bloat --locked
-
-# 安装 mold 快速链接器（固定版本，避免 GitHub API 限流导致构建失败）
-ENV MOLD_VERSION=2.42.0
-RUN curl -fsSL --retry 3 --retry-delay 5 \
-    "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/mold-${MOLD_VERSION}-x86_64-linux.tar.gz" \
-    -o /tmp/mold.tar.gz \
-    && tar -xzf /tmp/mold.tar.gz -C /tmp \
-    && cp /tmp/mold-${MOLD_VERSION}-x86_64-linux/bin/mold /usr/local/bin/mold \
-    && cp /tmp/mold-${MOLD_VERSION}-x86_64-linux/bin/ld.mold /usr/local/bin/ld.mold \
-    && rm -rf /tmp/mold* \
-    && mold --version
-
 # 配置 sccache
 ENV RUSTC_WRAPPER=sccache \
     SCCACHE_DIR=/cache/sccache \
@@ -153,11 +147,6 @@ RUN ln -sf /usr/local/cargo/bin/cargo /usr/local/bin/cargo && \
     ln -sf /usr/local/cargo/bin/cargo-clippy /usr/local/bin/cargo-clippy && \
     ln -sf /usr/local/cargo/bin/cargo-fmt /usr/local/bin/cargo-fmt && \
     ln -sf /usr/local/cargo/bin/rustfmt /usr/local/bin/rustfmt && \
-    ln -sf /usr/local/cargo/bin/cargo-deny /usr/local/bin/cargo-deny && \
-    ln -sf /usr/local/cargo/bin/cargo-udeps /usr/local/bin/cargo-udeps && \
-    ln -sf /usr/local/cargo/bin/cargo-outdated /usr/local/bin/cargo-outdated && \
-    ln -sf /usr/local/cargo/bin/cargo-nextest /usr/local/bin/cargo-nextest && \
-    ln -sf /usr/local/cargo/bin/cargo-bloat /usr/local/bin/cargo-bloat && \
     ln -sf /usr/bin/pwsh /usr/local/bin/pwsh && \
     ln -sf /usr/bin/fdfind /usr/local/bin/fd
 
@@ -180,14 +169,18 @@ RUN arch=$(uname -m) && \
     /opt/runner/bin/installdependencies.sh
 ENV PATH=/opt/runner/bin:$PATH
 
-# 验证安装（用 which 确保工具存在，避免 --version 输出格式差异导致失败）
-RUN which rustc && which cargo && which rustfmt && which cargo-clippy && \
-    which sccache && which cross && which mold && which clang && \
-    which pwsh && which cargo-deny && which cargo-nextest && \
-    which rg && which jq && which sqlite3 && which fd && \
-    rustc --version && cargo --version && rustfmt --version && \
-    cargo clippy --version && sccache --version && cross --version && \
-    mold --version && pwsh --version
+# 验证安装（核心工具验证）
+RUN rustc --version && \
+    cargo --version && \
+    rustfmt --version && \
+    cargo clippy --version && \
+    sccache --version && \
+    cross --version && \
+    mold --version && \
+    pwsh --version && \
+    rg --version | head -1 && \
+    jq --version && \
+    sqlite3 --version
 
 # 复制启动脚本
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
