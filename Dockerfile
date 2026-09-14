@@ -85,31 +85,7 @@ ENV RUSTUP_HOME=/usr/local/rustup \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile default \
     && rustup target add x86_64-unknown-linux-musl
 
-# 安装 sccache（编译缓存）
-RUN cargo install sccache --locked
-
-# 安装 cross（交叉编译）
-RUN cargo install cross --locked
-
-# 安装 cargo 开发工具（分开安装，便于定位问题；cargo-expand 需 nightly，暂不包含）
-RUN cargo install cargo-deny --locked
-RUN cargo install cargo-udeps --locked
-RUN cargo install cargo-outdated --locked
-RUN cargo install cargo-nextest --locked
-RUN cargo install cargo-bloat --locked
-
-# 安装 mold 快速链接器（固定版本，避免 GitHub API 限流导致构建失败）
-ENV MOLD_VERSION=2.42.0
-RUN curl -fsSL --retry 3 --retry-delay 5 \
-    "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/mold-${MOLD_VERSION}-x86_64-linux.tar.gz" \
-    -o /tmp/mold.tar.gz \
-    && tar -xzf /tmp/mold.tar.gz -C /tmp \
-    && cp /tmp/mold-${MOLD_VERSION}-x86_64-linux/bin/mold /usr/local/bin/mold \
-    && cp /tmp/mold-${MOLD_VERSION}-x86_64-linux/bin/ld.mold /usr/local/bin/ld.mold \
-    && rm -rf /tmp/mold* \
-    && mold --version
-
-# 配置 cargo 国内源（rsproxy，国内依赖下载更快）+ mold 链接器
+# 【关键】先配置 cargo 国内源（rsproxy），确保后续所有 cargo install 走国内镜像
 RUN mkdir -p /usr/local/cargo \
     && cat > /usr/local/cargo/config.toml << 'EOF'
 [source.crates-io]
@@ -135,6 +111,30 @@ rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 [target.x86_64-unknown-linux-musl]
 rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 EOF
+
+# 安装 sccache（编译缓存）
+RUN cargo install sccache --locked
+
+# 安装 cross（交叉编译）
+RUN cargo install cross --locked
+
+# 安装 cargo 开发工具（分开安装，便于定位问题；cargo-expand 需 nightly，暂不包含）
+RUN cargo install cargo-deny --locked
+RUN cargo install cargo-udeps --locked
+RUN cargo install cargo-outdated --locked
+RUN cargo install cargo-nextest --locked
+RUN cargo install cargo-bloat --locked
+
+# 安装 mold 快速链接器（固定版本，避免 GitHub API 限流导致构建失败）
+ENV MOLD_VERSION=2.42.0
+RUN curl -fsSL --retry 3 --retry-delay 5 \
+    "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/mold-${MOLD_VERSION}-x86_64-linux.tar.gz" \
+    -o /tmp/mold.tar.gz \
+    && tar -xzf /tmp/mold.tar.gz -C /tmp \
+    && cp /tmp/mold-${MOLD_VERSION}-x86_64-linux/bin/mold /usr/local/bin/mold \
+    && cp /tmp/mold-${MOLD_VERSION}-x86_64-linux/bin/ld.mold /usr/local/bin/ld.mold \
+    && rm -rf /tmp/mold* \
+    && mold --version
 
 # 配置 sccache
 ENV RUSTC_WRAPPER=sccache \
