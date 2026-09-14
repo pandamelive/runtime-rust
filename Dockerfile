@@ -1,8 +1,8 @@
 # runtime-rust - Rust 构建环境镜像（优化版）
-# 包含 stable 工具链、sccache、cross、musl-tools、mold、SSH 服务端、rustfmt、clippy 等
+# 包含 stable 工具链、sccache、cross、musl-tools、mold、SSH 服务端等
 FROM ubuntu:22.04
 LABEL maintainer="PandaNetPL"
-LABEL description="Rust 构建环境 - stable/sccache/cross/musl-tools/mold/ssh/rustfmt/clippy (optimized)"
+LABEL description="Rust 构建环境 - stable/sccache/cross/musl-tools/mold/ssh (optimized)"
 
 # 避免交互式配置
 ENV DEBIAN_FRONTEND=noninteractive
@@ -11,7 +11,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN sed -i 's|archive.ubuntu.com|mirrors.aliyun.com|g' /etc/apt/sources.list && \
     sed -i 's|security.ubuntu.com|mirrors.aliyun.com|g' /etc/apt/sources.list
 
-# 安装系统依赖
+# 安装系统依赖（新增 cmake/clang/libclang-dev/mold 依赖）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
@@ -50,8 +50,7 @@ ENV RUSTUP_HOME=/usr/local/rustup \
 #   rustup target add x86_64-pc-windows-gnu
 #   (注意: win-msvc / apple-darwin 在 Linux 上无法真正链接，需对应 SDK)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal \
-    && rustup target add x86_64-unknown-linux-musl \
-    && rustup component add rustfmt clippy
+    && rustup target add x86_64-unknown-linux-musl
 
 # 安装 sccache（编译缓存）
 RUN cargo install sccache --locked
@@ -110,9 +109,9 @@ RUN ln -sf /usr/local/cargo/bin/cargo /usr/local/bin/cargo && \
     ln -sf /usr/local/cargo/bin/rustup /usr/local/bin/rustup && \
     ln -sf /usr/local/cargo/bin/sccache /usr/local/bin/sccache && \
     ln -sf /usr/local/cargo/bin/cross /usr/local/bin/cross && \
-    ln -sf /usr/local/cargo/bin/cargo-clippy /usr/local/bin/cargo-clippy && \
-    ln -sf /usr/local/cargo/bin/cargo-fmt /usr/local/bin/cargo-fmt && \
-    ln -sf /usr/local/cargo/bin/rustfmt /usr/local/bin/rustfmt
+    ln -sf /usr/local/cargo/bin/cargo-clippy /usr/local/bin/cargo-clippy 2>/dev/null || true && \
+    ln -sf /usr/local/cargo/bin/cargo-fmt /usr/local/bin/cargo-fmt 2>/dev/null || true && \
+    ln -sf /usr/local/cargo/bin/rustfmt /usr/local/bin/rustfmt 2>/dev/null || true
 
 # 【双保险】环境变量写入 /etc/environment，确保 SSH non-login shell 继承
 RUN echo 'CARGO_HOME=/usr/local/cargo' >> /etc/environment && \
@@ -134,7 +133,7 @@ RUN arch=$(uname -m) && \
 ENV PATH=/opt/runner/bin:$PATH
 
 # 验证安装
-RUN rustc --version && cargo --version && rustfmt --version && cargo clippy --version && sccache --version && cross --version && mold --version && clang --version | head -1
+RUN rustc --version && cargo --version && sccache --version && cross --version && mold --version && clang --version | head -1
 
 # 复制启动脚本
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
