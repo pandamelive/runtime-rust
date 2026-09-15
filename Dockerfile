@@ -59,11 +59,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # 安装 PowerShell（合规脚本 check-compliance.ps1 运行环境）
+# 用 curl 代替 wget，避免 wget --retry 参数歧义
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        wget \
         apt-transport-https \
         software-properties-common \
-    && wget -q --retry=3 --tries=3 "https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb" \
+    && curl -fsSL --retry 3 "https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb" \
+        -o packages-microsoft-prod.deb \
     && dpkg -i packages-microsoft-prod.deb \
     && apt-get update && apt-get install -y --no-install-recommends \
         powershell \
