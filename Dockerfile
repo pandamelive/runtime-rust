@@ -122,8 +122,10 @@ RUN echo 'CARGO_HOME=/usr/local/cargo' >> /etc/environment && \
     echo 'PATH=/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' >> /etc/environment
 
 # GitHub Actions Runner（设置 RUNNER_TOKEN 时自动启用，不设置则纯 SSH 模式）
+# 注意：uname -m 返回 x86_64，但 GitHub Runner 文件名用 x64，需映射
 ARG RUNNER_VERSION=2.319.1
 RUN arch=$(uname -m) && \
+    if [ "$arch" = "x86_64" ]; then arch="x64"; fi && \
     curl -fsSL --retry 3 --retry-delay 5 \
     "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-${arch}-${RUNNER_VERSION}.tar.gz" \
     -o /tmp/runner.tar.gz && \
